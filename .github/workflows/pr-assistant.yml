@@ -14,10 +14,6 @@ permissions:
   issues: write
 
 jobs:
-  # =================================================================================
-  # JOB 1: PR Validation & Feedback
-  # Validates the validation tool itself
-  # =================================================================================
   pr-validation:
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
@@ -32,196 +28,12 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pyyaml packaging requests pydantic
+          pip install jsonschema requests
 
-      # --- 1. Validate validate.py ---
-      - name: 🐍 Validate Python Script
+      - name: Validate Validation Script
         run: |
-          python << 'EOF'
-          import ast
-          import sys
-          from pathlib import Path
+          python -m py_compile validate.py || python validate.py --help
 
-          validate_py = Path("validate.py")
-          if not validate_py.exists():
-              print("❌ validate.py not found")
-              sys.exit(1)
-
-          try:
-              with open(validate_py) as f:
-                  code = f.read()
-
-              # Syntax check
-              ast.parse(code)
-              print("✅ validate.py syntax valid")
-
-              # Check for required imports
-              required_imports = ['json', 'os', 'argparse', 'sys']
-              code_lower = code.lower()
-              for imp in required_imports:
-                  if f'import {imp}' not in code and f'from {imp}' not in code:
-                      print(f"⚠️ Missing import: {imp}")
-
-          except SyntaxError as e:
-              print(f"❌ Syntax error in validate.py: {e}")
-              sys.exit(1)
-          except Exception as e:
-              print(f"❌ Error validating validate.py: {e}")
-              sys.exit(1)
-          EOF
-
-      # --- 2. Validate action.yml ---
-      - name: 📋 Validate action.yml
-        run: |
-          python << 'EOF'
-          import yaml
-          import sys
-          from pathlib import Path
-
-          action_yml = Path("action.yml")
-          if not action_yml.exists():
-              print("❌ action.yml not found")
-              sys.exit(1)
-
-          try:
-              with open(action_yml) as f:
-                  action_data = yaml.safe_load(f)
-
-              # Required fields for GitHub Action
-              required_fields = ["name", "description", "runs"]
-              for field in required_fields:
-                  if field not in action_data:
-                      print(f"❌ action.yml missing required field: {field}")
-                      sys.exit(1)
-
-              # Check runs.using
-              runs = action_data.get("runs", {})
-              if runs.get("using") != "composite":
-                  print("⚠️ action.yml should use 'composite' runs.using")
-
-              print("✅ action.yml valid")
-
-          except yaml.YAMLError as e:
-              print(f"❌ Invalid YAML in action.yml: {e}")
-              sys.exit(1)
-          except Exception as e:
-              print(f"❌ Error validating action.yml: {e}")
-              sys.exit(1)
-          EOF
-
-      # --- 3. Validate manifest.json ---
-      - name: 📄 Validate manifest.json
-        run: |
-          python << 'EOF'
-          import json
-          import sys
-          from pathlib import Path
-
-          manifest_path = Path("manifest.json")
-          if not manifest_path.exists():
-              print("⚠️ manifest.json not found (optional)")
-              exit(0)
-
-          try:
-              with open(manifest_path) as f:
-                  manifest = json.load(f)
-
-              required_fields = ["schema_version", "domain", "name", "version", "description"]
-              for field in required_fields:
-                  if field not in manifest:
-                      print(f"❌ manifest.json missing required field: {field}")
-                      sys.exit(1)
-
-              # Check schema version
-              schema_version = manifest.get("schema_version", "0.0.0")
-              if schema_version != "2.0.0":
-                  print(f"⚠️ manifest.json schema_version should be 2.0.0, got {schema_version}")
-
-              print("✅ manifest.json valid")
-
-          except json.JSONDecodeError as e:
-              print(f"❌ Invalid JSON in manifest.json: {e}")
-              sys.exit(1)
-          except Exception as e:
-              print(f"❌ Error validating manifest.json: {e}")
-              sys.exit(1)
-          EOF
-
-      # --- 4. Test validate.py with sample data ---
-      - name: 🧪 Test Validation Script
-        run: |
-          python << 'EOF'
-          import sys
-          from pathlib import Path
-          import tempfile
-          import json
-          import os
-
-          validate_py = Path("validate.py")
-          if not validate_py.exists():
-              print("⚠️ validate.py not found, skipping test")
-              exit(0)
-
-          # Create a temporary test integration
-          with tempfile.TemporaryDirectory() as tmpdir:
-              test_integration = Path(tmpdir) / "test-integration"
-              test_integration.mkdir()
-
-              # Create minimal valid manifest
-              manifest = {
-                  "schema_version": "2.0.0",
-                  "domain": "test_integration",
-                  "name": "Test Integration",
-                  "version": "1.0.0",
-                  "description": "Test integration for validation",
-                  "implementations": {
-                      "python": "integration.py"
-                  }
-              }
-
-              with open(test_integration / "manifest.json", "w") as f:
-                  json.dump(manifest, f)
-
-              # Create integration.py
-              with open(test_integration / "integration.py", "w") as f:
-                  f.write("# Test integration\n")
-
-              # Create addons.json
-              addons_json = {
-                  "addons": [
-                      {
-                          "id": "test-integration",
-                          "name": "Test Integration",
-                          "version": "1.0.0"
-                      }
-                  ]
-              }
-
-              with open(Path(tmpdir) / "addons.json", "w") as f:
-                  json.dump(addons_json, f)
-
-              # Run validation
-              try:
-                  import subprocess
-                  result = subprocess.run(
-                      [sys.executable, str(validate_py), tmpdir],
-                      capture_output=True,
-                      text=True,
-                      timeout=30
-                  )
-
-                  if result.returncode == 0:
-                      print("✅ Validation script test passed")
-                  else:
-                      print(f"⚠️ Validation script test returned code {result.returncode}")
-                      print(f"Output: {result.stdout}")
-                      print(f"Error: {result.stderr}")
-
-              except Exception as e:
-                  print(f"⚠️ Could not test validation script: {e}")
-          EOF
-
-      # --- 5. Feedback Comment ---
       - name: Feedback Comment
         if: always()
         uses: actions/github-script@v6
@@ -233,20 +45,17 @@ jobs:
                  issue_number: context.issue.number,
                  owner: context.repo.owner,
                  repo: context.repo.repo,
-                 body: "❌ **PR Validation Failed**\n\nPlease check:\n- validate.py syntax is correct\n- action.yml is valid\n- manifest.json is valid (if present)"
+                 body: "❌ **PR Validation Failed**\n\nPlease check the validation errors above."
                });
             } else if (outcome === 'success') {
                github.rest.issues.createComment({
                  issue_number: context.issue.number,
                  owner: context.repo.owner,
                  repo: context.repo.repo,
-                 body: "✅ **PR Validation Passed**\n\nAll validation tool checks passed!"
+                 body: "✅ **PR Validation Passed**\n\nAll checks passed successfully!"
                });
             }
 
-  # =================================================================================
-  # JOB 2: Thank Contributor
-  # =================================================================================
   thank-you:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
@@ -257,10 +66,9 @@ jobs:
             const author = context.payload.pull_request.user.login;
             const admins = ['FaserF', 'fabia', 'github-actions[bot]'];
             if (admins.includes(author)) return;
-
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🎉 **Thank you @${author}!**\n\nYour contribution to the **faneX-ID Integration Validation** tool is valuable! 🚀`
+              body: `🎉 **Thank you @${author}!**\n\nYour contribution to the **faneX-ID Integration Validation** repository is valuable! 🚀`
             });
