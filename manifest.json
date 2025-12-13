@@ -1,0 +1,41 @@
+{
+    "schema_version": "2.0.0",
+    "domain": "integration_validation",
+    "name": "Integration Validation",
+    "version": "1.0.0",
+    "description": "Validation tool and GitHub Action for validating faneX-ID integration manifests and repository structure.",
+    "min_core_version": "2025.12.0",
+    "logo": "https://cdn-icons-png.flaticon.com/512/1828/1828817.png",
+    "documentation": "https://fanex-id.com/docs/development/validation",
+    "source_url": "https://github.com/faneX-ID/integration-validation",
+    "codeowners": [
+        "@faneX-Team"
+    ],
+    "is_system": false,
+    "connection_type": "local",
+    "capabilities": [
+        "system_core"
+    ],
+    "implementations": {
+        "python": "validate.py"
+    },
+    "requirements": [
+        "packaging>=23.0"
+    ],
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "core_version": {
+                "type": "string",
+                "title": "Core Version",
+                "description": "faneX-ID core version for compatibility checking"
+            },
+            "strict_mode": {
+                "type": "boolean",
+                "title": "Strict Mode",
+                "description": "Enable strict validation mode",
+                "default": false
+            }
+        }
+    }
+}
