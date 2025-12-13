@@ -1,0 +1,42 @@
+name: 'faneX-ID Integration Validation'
+description: 'Validates faneX-ID integrations (manifest, domain, version compatibility)'
+inputs:
+  core_version:
+    description: 'The core version of faneX-ID to check compatibility against (e.g., 0.1.0)'
+    required: false
+    default: ""
+  working_directory:
+    description: 'Directory to validate'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        pip install pyyaml packaging requests pydantic
+
+    - name: Run Validation Script
+      shell: bash
+      env:
+        CORE_VERSION: ${{ inputs.core_version }}
+        TARGET_DIR: ${{ inputs.working_directory }}
+      run: |
+        # Locate the validate.py relative to the action path
+        SCRIPT_PATH="${{ github.action_path }}/validate.py"
+
+        CMD="python $SCRIPT_PATH $TARGET_DIR"
+
+        if [ -n "$CORE_VERSION" ]; then
+          CMD="$CMD --core-version $CORE_VERSION"
+        fi
+
+        echo "Running: $CMD"
+        $CMD
