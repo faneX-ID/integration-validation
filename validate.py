@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import os
 import json
-import yaml
 import argparse
 import sys
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # We use packaging.version for robust version comparison
 try:
